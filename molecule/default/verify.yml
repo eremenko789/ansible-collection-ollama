@@ -1,0 +1,107 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  
+  tasks:
+    - name: Check if Docker is installed and running
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+      register: docker_service
+      
+    - name: Verify Docker service is active
+      ansible.builtin.assert:
+        that:
+          - docker_service.status.ActiveState == "active"
+        fail_msg: "Docker service is not active"
+        success_msg: "Docker service is running"
+
+    - name: Check if Ollama container is running
+      community.docker.docker_container_info:
+        name: ollama
+      register: ollama_container
+      
+    - name: Verify Ollama container is running
+      ansible.builtin.assert:
+        that:
+          - ollama_container.exists
+          - ollama_container.container.State.Status == "running"
+        fail_msg: "Ollama container is not running"
+        success_msg: "Ollama container is running"
+
+    - name: Check if Ollama port is listening
+      ansible.builtin.wait_for:
+        host: "0.0.0.0"
+        port: 11434
+        timeout: 30
+      register: port_check
+
+    - name: Verify Ollama API is responding
+      ansible.builtin.uri:
+        url: "http://localhost:11434/api/version"
+        method: GET
+        timeout: 10
+      register: api_response
+      retries: 3
+      delay: 5
+      until: api_response.status == 200
+
+    - name: Verify API response contains version
+      ansible.builtin.assert:
+        that:
+          - api_response.status == 200
+          - api_response.json is defined
+        fail_msg: "Ollama API is not responding correctly"
+        success_msg: "Ollama API is working"
+
+    - name: Check Docker volumes (if not using host volumes)
+      community.docker.docker_volume_info:
+        name: "{{ item }}"
+      loop:
+        - ollama_data
+        - ollama_models
+      register: volume_info
+      when: not ollama_use_host_volumes | default(false)
+
+    - name: Verify volumes exist
+      ansible.builtin.assert:
+        that:
+          - item.exists
+        fail_msg: "Volume {{ item.volume.Name }} does not exist"
+        success_msg: "Volume {{ item.volume.Name }} exists"
+      loop: "{{ volume_info.results }}"
+      when: 
+        - volume_info is defined
+        - not ollama_use_host_volumes | default(false)
+
+    - name: Test Ollama tags endpoint
+      ansible.builtin.uri:
+        url: "http://localhost:11434/api/tags"
+        method: GET
+        timeout: 10
+      register: tags_response
+
+    - name: Verify tags endpoint works
+      ansible.builtin.assert:
+        that:
+          - tags_response.status == 200
+          - tags_response.json is defined
+          - tags_response.json.models is defined
+        fail_msg: "Ollama tags endpoint is not working"
+        success_msg: "Ollama tags endpoint is working"
+
+    - name: Check container logs for errors
+      ansible.builtin.command:
+        cmd: docker logs ollama --tail 50
+      register: container_logs
+      changed_when: false
+
+    - name: Verify no critical errors in logs
+      ansible.builtin.assert:
+        that:
+          - "'panic' not in container_logs.stdout.lower()"
+          - "'fatal' not in container_logs.stdout.lower()"
+        fail_msg: "Critical errors found in container logs"
+        success_msg: "No critical errors in container logs"

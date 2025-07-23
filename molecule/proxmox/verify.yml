@@ -1,0 +1,173 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: false
+  
+  tasks:
+    - name: Check if Docker is installed and running
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+      register: docker_service
+      
+    - name: Verify Docker service is active
+      ansible.builtin.assert:
+        that:
+          - docker_service.status.ActiveState == "active"
+        fail_msg: "Docker service is not active"
+        success_msg: "Docker service is running"
+
+    - name: Check if Ollama container is running
+      community.docker.docker_container_info:
+        name: ollama
+      register: ollama_container
+      
+    - name: Verify Ollama container is running
+      ansible.builtin.assert:
+        that:
+          - ollama_container.exists
+          - ollama_container.container.State.Status == "running"
+        fail_msg: "Ollama container is not running"
+        success_msg: "Ollama container is running"
+
+    - name: Check if Ollama port is listening
+      ansible.builtin.wait_for:
+        host: "0.0.0.0"
+        port: 11434
+        timeout: 30
+      register: port_check
+
+    - name: Verify Ollama API is responding
+      ansible.builtin.uri:
+        url: "http://localhost:11434/api/version"
+        method: GET
+        timeout: 10
+      register: api_response
+      retries: 5
+      delay: 10
+      until: api_response.status == 200
+
+    - name: Verify API response contains version
+      ansible.builtin.assert:
+        that:
+          - api_response.status == 200
+          - api_response.json is defined
+        fail_msg: "Ollama API is not responding correctly"
+        success_msg: "Ollama API is working"
+
+    - name: Check host volumes exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /opt/ollama/data
+        - /opt/ollama/models
+      register: volume_dirs
+
+    - name: Verify host volumes are created
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.isdir
+        fail_msg: "Host volume {{ item.item }} does not exist"
+        success_msg: "Host volume {{ item.item }} exists"
+      loop: "{{ volume_dirs.results }}"
+
+    - name: Test Ollama tags endpoint
+      ansible.builtin.uri:
+        url: "http://localhost:11434/api/tags"
+        method: GET
+        timeout: 10
+      register: tags_response
+
+    - name: Verify tags endpoint works
+      ansible.builtin.assert:
+        that:
+          - tags_response.status == 200
+          - tags_response.json is defined
+          - tags_response.json.models is defined
+        fail_msg: "Ollama tags endpoint is not working"
+        success_msg: "Ollama tags endpoint is working"
+
+    - name: Wait for model to be loaded (if any)
+      ansible.builtin.pause:
+        seconds: 30
+      when: ollama_preload_models | default([]) | length > 0
+
+    - name: Check if preloaded models are available
+      ansible.builtin.uri:
+        url: "http://localhost:11434/api/tags"
+        method: GET
+        timeout: 30
+      register: models_check
+      when: ollama_preload_models | default([]) | length > 0
+
+    - name: Verify preloaded models exist
+      ansible.builtin.assert:
+        that:
+          - models_check.json.models | selectattr('name', 'match', item + '.*') | list | length > 0
+        fail_msg: "Model {{ item }} was not loaded"
+        success_msg: "Model {{ item }} is available"
+      loop: "{{ ollama_preload_models | default([]) }}"
+      when: ollama_preload_models | default([]) | length > 0
+
+    - name: Test model generation (if models are loaded)
+      ansible.builtin.uri:
+        url: "http://localhost:11434/api/generate"
+        method: POST
+        body_format: json
+        body:
+          model: "{{ ollama_preload_models[0] }}"
+          prompt: "Say hello"
+          stream: false
+        timeout: 120
+      register: generation_test
+      when: ollama_preload_models | default([]) | length > 0
+
+    - name: Verify model generation works
+      ansible.builtin.assert:
+        that:
+          - generation_test.status == 200
+          - generation_test.json.response is defined
+          - generation_test.json.response | length > 0
+        fail_msg: "Model generation failed"
+        success_msg: "Model generation works"
+      when: ollama_preload_models | default([]) | length > 0
+
+    - name: Check container logs for errors
+      ansible.builtin.command:
+        cmd: docker logs ollama --tail 100
+      register: container_logs
+      changed_when: false
+
+    - name: Verify no critical errors in logs
+      ansible.builtin.assert:
+        that:
+          - "'panic' not in container_logs.stdout.lower()"
+          - "'fatal' not in container_logs.stdout.lower()"
+        fail_msg: "Critical errors found in container logs"
+        success_msg: "No critical errors in container logs"
+
+    - name: Check container resource usage
+      ansible.builtin.command:
+        cmd: docker stats ollama --no-stream --format "table {{ "{{" }}.MemUsage{{ "}}" }}\t{{ "{{" }}.CPUPerc{{ "}}" }}"
+      register: resource_stats
+      changed_when: false
+
+    - name: Display resource usage
+      ansible.builtin.debug:
+        msg: "Container resource usage: {{ resource_stats.stdout }}"
+
+    - name: Test external connectivity
+      ansible.builtin.command:
+        cmd: curl -s http://localhost:11434/api/version
+      register: curl_test
+      changed_when: false
+
+    - name: Verify external connectivity works
+      ansible.builtin.assert:
+        that:
+          - curl_test.rc == 0
+          - '"version"' in curl_test.stdout
+        fail_msg: "External connectivity test failed"
+        success_msg: "External connectivity works"

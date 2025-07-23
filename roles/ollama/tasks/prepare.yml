@@ -1,0 +1,119 @@
+---
+# Подготовка системы для развертывания Ollama
+
+- name: Обновить кэш пакетов
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  become: true
+
+- name: Установить необходимые пакеты
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - python3-pip
+    state: present
+  become: true
+
+- name: Установить Docker GPG ключ
+  ansible.builtin.apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+  become: true
+
+- name: Добавить Docker репозиторий
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+    filename: docker
+  become: true
+
+- name: Установить Docker
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: true
+  become: true
+
+- name: Запустить и включить службу Docker
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true
+  become: true
+
+- name: Установить Docker Python модуль
+  ansible.builtin.pip:
+    name:
+      - docker
+      - docker-compose
+    state: present
+  become: true
+
+- name: Создать группу ollama
+  ansible.builtin.group:
+    name: "{{ ollama_group }}"
+    gid: "{{ ollama_gid }}"
+    state: present
+  become: true
+  when: ollama_use_host_volumes
+
+- name: Создать пользователя ollama
+  ansible.builtin.user:
+    name: "{{ ollama_user }}"
+    uid: "{{ ollama_uid }}"
+    group: "{{ ollama_group }}"
+    home: "/home/{{ ollama_user }}"
+    shell: /bin/bash
+    create_home: true
+    state: present
+  become: true
+  when: ollama_use_host_volumes
+
+- name: Создать директории на хосте для данных Ollama
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ ollama_user }}"
+    group: "{{ ollama_group }}"
+    mode: '0755'
+  become: true
+  loop:
+    - "{{ ollama_host_data_path }}"
+    - "{{ ollama_host_models_path }}"
+  when: ollama_use_host_volumes
+
+- name: Установить nvidia-container-toolkit (если включена GPU поддержка)
+  block:
+    - name: Добавить NVIDIA GPG ключ
+      ansible.builtin.apt_key:
+        url: https://nvidia.github.io/libnvidia-container/gpgkey
+        state: present
+
+    - name: Добавить NVIDIA репозиторий
+      ansible.builtin.apt_repository:
+        repo: "deb https://nvidia.github.io/libnvidia-container/stable/deb/$(ARCH) /"
+        state: present
+        filename: nvidia-container-toolkit
+
+    - name: Установить nvidia-container-toolkit
+      ansible.builtin.apt:
+        name: nvidia-container-toolkit
+        state: present
+        update_cache: true
+
+    - name: Перезапустить Docker для применения изменений NVIDIA
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+  become: true
+  when: ollama_enable_gpu

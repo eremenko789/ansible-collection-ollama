@@ -1,0 +1,41 @@
+---
+# Базовое развертывание Ollama
+- name: Deploy Ollama - Basic Setup
+  hosts: ollama_servers
+  become: true
+  gather_facts: true
+  
+  vars:
+    ollama_version: "latest"
+    ollama_use_host_volumes: false
+    ollama_preload_models: []
+    
+  roles:
+    - role: community.ollama.ollama
+      tags: ['ollama']
+      
+  post_tasks:
+    - name: Verify Ollama is accessible
+      uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ ollama_port | default(11434) }}/api/version"
+        method: GET
+        timeout: 10
+      register: ollama_version_check
+      retries: 3
+      delay: 5
+      
+    - name: Display Ollama version
+      debug:
+        msg: "Ollama version: {{ ollama_version_check.json.version | default('Unknown') }}"
+        
+    - name: Show deployment summary
+      debug:
+        msg:
+          - "=== Ollama Deployment Summary ==="
+          - "Host: {{ inventory_hostname }}"
+          - "IP: {{ ansible_default_ipv4.address }}"
+          - "Port: {{ ollama_port | default(11434) }}"
+          - "API URL: http://{{ ansible_default_ipv4.address }}:{{ ollama_port | default(11434) }}/api/version"
+          - "Container: {{ ollama_container_name | default('ollama') }}"
+          - "GPU Enabled: {{ ollama_enable_gpu | default(false) }}"
+          - "Host Volumes: {{ ollama_use_host_volumes | default(false) }}"

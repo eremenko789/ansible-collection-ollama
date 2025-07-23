@@ -1,0 +1,85 @@
+---
+# Загрузка моделей Ollama
+
+- name: Ожидать готовности Ollama API перед загрузкой моделей
+  ansible.builtin.uri:
+    url: "http://{{ ollama_host }}:{{ ollama_port }}/api/version"
+    method: GET
+    timeout: 10
+  register: ollama_api_ready
+  retries: 5
+  delay: 10
+  until: ollama_api_ready.status == 200
+
+- name: Получить список установленных моделей
+  ansible.builtin.uri:
+    url: "http://{{ ollama_host }}:{{ ollama_port }}/api/tags"
+    method: GET
+    timeout: 30
+  register: ollama_installed_models
+
+- name: Создать список установленных моделей
+  ansible.builtin.set_fact:
+    installed_model_names: "{{ ollama_installed_models.json.models | map(attribute='name') | map('regex_replace', ':.*$', '') | list }}"
+  when: ollama_installed_models.json.models is defined
+
+- name: Установить пустой список если модели не найдены
+  ansible.builtin.set_fact:
+    installed_model_names: []
+  when: ollama_installed_models.json.models is not defined
+
+- name: Загрузить модель через API
+  ansible.builtin.uri:
+    url: "http://{{ ollama_host }}:{{ ollama_port }}/api/pull"
+    method: POST
+    body_format: json
+    body:
+      name: "{{ item }}"
+    timeout: 1800  # 30 минут на загрузку модели
+    status_code: 200
+  loop: "{{ ollama_preload_models }}"
+  when: item not in installed_model_names
+  register: model_pull_results
+
+- name: Вывести результаты загрузки моделей
+  ansible.builtin.debug:
+    msg:
+      - "Загружена модель: {{ item.item }}"
+      - "Статус: {{ 'Успешно' if item.status == 200 else 'Ошибка' }}"
+  loop: "{{ model_pull_results.results }}"
+  when: model_pull_results.results is defined and not item.skipped | default(false)
+
+- name: Проверить список моделей после загрузки
+  ansible.builtin.uri:
+    url: "http://{{ ollama_host }}:{{ ollama_port }}/api/tags"
+    method: GET
+    timeout: 30
+  register: ollama_final_models
+
+- name: Вывести список доступных моделей
+  ansible.builtin.debug:
+    msg: "Доступные модели: {{ ollama_final_models.json.models | map(attribute='name') | list }}"
+  when: ollama_final_models.json.models is defined
+
+- name: Протестировать загруженные модели
+  ansible.builtin.uri:
+    url: "http://{{ ollama_host }}:{{ ollama_port }}/api/generate"
+    method: POST
+    body_format: json
+    body:
+      model: "{{ item }}"
+      prompt: "Hello, how are you?"
+      stream: false
+    timeout: 60
+  loop: "{{ ollama_preload_models }}"
+  register: model_test_results
+  ignore_errors: true
+
+- name: Вывести результаты тестирования моделей
+  ansible.builtin.debug:
+    msg:
+      - "Модель: {{ item.item }}"
+      - "Тест: {{ 'Пройден' if item.status == 200 else 'Не пройден' }}"
+      - "Ответ: {{ item.json.response[:100] + '...' if item.json is defined and item.json.response is defined else 'Нет ответа' }}"
+  loop: "{{ model_test_results.results }}"
+  when: model_test_results.results is defined

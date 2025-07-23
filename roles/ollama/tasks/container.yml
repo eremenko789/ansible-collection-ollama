@@ -1,0 +1,102 @@
+---
+# Развертывание контейнера Ollama
+
+- name: Остановить существующий контейнер Ollama (если есть)
+  community.docker.docker_container:
+    name: "{{ ollama_container_name }}"
+    state: absent
+  ignore_errors: true
+
+- name: Подготовить порты для контейнера
+  ansible.builtin.set_fact:
+    ollama_ports_list: >-
+      {{
+        [ollama_port ~ ':' ~ ollama_port] +
+        (ollama_additional_ports | default([]))
+      }}
+
+- name: Подготовить volumes для контейнера (Docker volumes)
+  ansible.builtin.set_fact:
+    ollama_volumes_list:
+      - "{{ ollama_data_volume }}:/root/.ollama"
+      - "{{ ollama_models_volume }}:/root/.ollama/models"
+  when: not ollama_use_host_volumes
+
+- name: Подготовить volumes для контейнера (Host directories)
+  ansible.builtin.set_fact:
+    ollama_volumes_list:
+      - "{{ ollama_host_data_path }}:/root/.ollama"
+      - "{{ ollama_host_models_path }}:/root/.ollama/models"
+  when: ollama_use_host_volumes
+
+- name: Запустить контейнер Ollama (без GPU)
+  community.docker.docker_container:
+    name: "{{ ollama_container_name }}"
+    image: "{{ ollama_image }}:{{ ollama_version }}"
+    state: started
+    restart_policy: "{{ ollama_restart_policy }}"
+    ports: "{{ ollama_ports_list }}"
+    volumes: "{{ ollama_volumes_list }}"
+    env: "{{ ollama_environment_vars }}"
+    memory: "{{ ollama_memory_limit }}"
+    cpus: "{{ ollama_cpus }}"
+    log_driver: "{{ ollama_log_driver }}"
+    log_options: "{{ ollama_log_options }}"
+    security_opts: "{{ ollama_security_opts }}"
+    pull: true
+  when: not ollama_enable_gpu
+
+- name: Запустить контейнер Ollama (с GPU)
+  community.docker.docker_container:
+    name: "{{ ollama_container_name }}"
+    image: "{{ ollama_image }}:{{ ollama_version }}"
+    state: started
+    restart_policy: "{{ ollama_restart_policy }}"
+    ports: "{{ ollama_ports_list }}"
+    volumes: "{{ ollama_volumes_list }}"
+    env: "{{ ollama_environment_vars }}"
+    memory: "{{ ollama_memory_limit }}"
+    cpus: "{{ ollama_cpus }}"
+    log_driver: "{{ ollama_log_driver }}"
+    log_options: "{{ ollama_log_options }}"
+    security_opts: "{{ ollama_security_opts }}"
+    device_requests: "{{ ollama_gpu_device_requests }}"
+    pull: true
+  when: ollama_enable_gpu
+
+- name: Ожидать запуска Ollama сервиса
+  ansible.builtin.wait_for:
+    host: "{{ ollama_host }}"
+    port: "{{ ollama_port }}"
+    delay: 10
+    timeout: 60
+    msg: "Ollama сервис не запустился в течение 60 секунд"
+
+- name: Проверить статус контейнера Ollama
+  community.docker.docker_container_info:
+    name: "{{ ollama_container_name }}"
+  register: ollama_container_info
+
+- name: Вывести информацию о контейнере
+  ansible.builtin.debug:
+    msg:
+      - "Контейнер: {{ ollama_container_name }}"
+      - "Статус: {{ ollama_container_info.container.State.Status }}"
+      - "Порты: {{ ollama_ports_list }}"
+      - "GPU включено: {{ ollama_enable_gpu }}"
+      - "Использование host volumes: {{ ollama_use_host_volumes }}"
+
+- name: Проверить доступность API Ollama
+  ansible.builtin.uri:
+    url: "http://{{ ollama_host }}:{{ ollama_port }}/api/version"
+    method: GET
+    timeout: 10
+  register: ollama_api_check
+  retries: 3
+  delay: 5
+  until: ollama_api_check.status == 200
+  ignore_errors: true
+
+- name: Вывести статус API
+  ansible.builtin.debug:
+    msg: "Ollama API {{ 'доступен' if ollama_api_check.status == 200 else 'недоступен' }}"

@@ -1,0 +1,67 @@
+---
+# Основные параметры Ollama
+ollama_version: "latest"
+ollama_image: "ollama/ollama"
+ollama_container_name: "ollama"
+
+# Сетевые настройки
+ollama_port: 11434
+ollama_host: "0.0.0.0"
+
+# Настройки Docker volumes
+ollama_use_host_volumes: false
+ollama_data_volume: "ollama_data"
+ollama_models_volume: "ollama_models"
+
+# Пути на хосте (используются если ollama_use_host_volumes: true)
+ollama_host_data_path: "/opt/ollama/data"
+ollama_host_models_path: "/opt/ollama/models"
+
+# Переменные окружения для контейнера
+ollama_environment_vars:
+  OLLAMA_HOST: "{{ ollama_host }}:{{ ollama_port }}"
+  OLLAMA_MODELS: "/root/.ollama/models"
+
+# Дополнительные параметры контейнера
+ollama_restart_policy: "unless-stopped"
+ollama_memory_limit: "4g"
+ollama_cpus: "2.0"
+
+# GPU поддержка (требует nvidia-container-toolkit)
+ollama_enable_gpu: false
+ollama_gpu_device_requests:
+  - driver: nvidia
+    count: all
+    capabilities:
+      - gpu
+
+# Логирование
+ollama_log_driver: "json-file"
+ollama_log_options:
+  max-size: "10m"
+  max-file: "3"
+
+# Модели для предварительной загрузки
+ollama_preload_models: []
+# Пример:
+# ollama_preload_models:
+#   - llama2
+#   - codellama
+
+# Пользователь и группа для работы с файлами на хосте
+ollama_user: "ollama"
+ollama_group: "ollama"
+ollama_uid: 1000
+ollama_gid: 1000
+
+# Настройки безопасности
+ollama_security_opts: []
+# Пример:
+# ollama_security_opts:
+#   - "no-new-privileges:true"
+
+# Дополнительные порты для проброса
+ollama_additional_ports: []
+# Пример:
+# ollama_additional_ports:
+#   - "8080:8080"
