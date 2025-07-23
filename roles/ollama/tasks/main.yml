@@ -1,0 +1,27 @@
+---
+# Основные задачи для развертывания Ollama
+
+- name: Включить задачи для подготовки системы
+  ansible.builtin.include_tasks: prepare.yml
+  tags:
+    - ollama
+    - prepare
+
+- name: Включить задачи для управления Docker volumes
+  ansible.builtin.include_tasks: volumes.yml
+  tags:
+    - ollama
+    - volumes
+
+- name: Включить задачи для развертывания контейнера
+  ansible.builtin.include_tasks: container.yml
+  tags:
+    - ollama
+    - container
+
+- name: Включить задачи для загрузки моделей
+  ansible.builtin.include_tasks: models.yml
+  when: ollama_preload_models | length > 0
+  tags:
+    - ollama
+    - models

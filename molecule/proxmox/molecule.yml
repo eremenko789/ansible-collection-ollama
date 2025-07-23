@@ -1,0 +1,78 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: requirements.yml
+
+driver:
+  name: community.general.proxmox
+
+platforms:
+  - name: ollama-test-ubuntu-24.04
+    # Настройки Proxmox
+    proxmox_host: "${PROXMOX_HOST:-proxmox.local}"
+    proxmox_user: "${PROXMOX_USER:-root@pam}"
+    proxmox_password: "${PROXMOX_PASSWORD}"
+    proxmox_node: "${PROXMOX_NODE:-proxmox}"
+    
+    # Настройки VM
+    vmid: 9999
+    template: "ubuntu-24.04-template"  # Имя шаблона Ubuntu 24.04
+    memory: 4096
+    cores: 2
+    sockets: 1
+    disk: "32"
+    storage: "local-lvm"
+    net: "virtio,bridge=vmbr0"
+    
+    # SSH настройки
+    ssh_user: ubuntu
+    ssh_key_file: "${HOME}/.ssh/id_rsa"
+    
+    # Дополнительные настройки
+    onboot: false
+    autostart: false
+    clone: true
+    full: true
+    timeout: 600
+
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      interpreter_python: auto_silent
+      callback_whitelist: profile_tasks, timer, yaml
+      host_key_checking: false
+    ssh_connection:
+      pipelining: false
+  inventory:
+    host_vars:
+      ollama-test-ubuntu-24.04:
+        # Переменные для роли Ollama
+        ollama_version: "latest"
+        ollama_use_host_volumes: true
+        ollama_host_data_path: "/opt/ollama/data"
+        ollama_host_models_path: "/opt/ollama/models"
+        ollama_preload_models:
+          - "tinyllama"  # Небольшая модель для тестов
+        ollama_memory_limit: "2g"
+        ollama_cpus: "2.0"
+        ollama_enable_gpu: false
+
+verifier:
+  name: ansible
+
+scenario:
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - side_effect
+    - verify
+    - cleanup
+    - destroy

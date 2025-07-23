@@ -1,0 +1,100 @@
+---
+# Развертывание Ollama с поддержкой GPU
+- name: Deploy Ollama with GPU Support
+  hosts: gpu_servers
+  become: true
+  gather_facts: true
+  
+  vars:
+    # GPU конфигурация
+    ollama_enable_gpu: true
+    ollama_memory_limit: "8g"
+    ollama_cpus: "4.0"
+    
+    # Модели для загрузки
+    ollama_preload_models:
+      - "llama2"
+      - "mistral"
+    
+    # Volumes
+    ollama_use_host_volumes: true
+    ollama_host_data_path: "/srv/ollama/data"
+    ollama_host_models_path: "/srv/ollama/models"
+    
+    # Безопасность
+    ollama_security_opts:
+      - "no-new-privileges:true"
+      
+  pre_tasks:
+    - name: Check GPU availability
+      command: nvidia-smi
+      register: gpu_check
+      failed_when: false
+      changed_when: false
+      
+    - name: Display GPU info
+      debug:
+        msg: "GPU detected: {{ 'Yes' if gpu_check.rc == 0 else 'No' }}"
+        
+    - name: Warning if no GPU found
+      debug:
+        msg: "WARNING: No NVIDIA GPU detected, but GPU support is enabled!"
+      when: gpu_check.rc != 0
+      
+  roles:
+    - role: community.ollama.ollama
+      tags: ['ollama']
+      
+  post_tasks:
+    - name: Verify GPU access in container
+      docker_container_exec:
+        container: "{{ ollama_container_name | default('ollama') }}"
+        command: nvidia-smi
+      register: container_gpu_check
+      failed_when: false
+      changed_when: false
+      when: ollama_enable_gpu | default(false)
+      
+    - name: Display container GPU status
+      debug:
+        msg: "GPU accessible in container: {{ 'Yes' if container_gpu_check.rc == 0 else 'No' }}"
+      when: ollama_enable_gpu | default(false)
+      
+    - name: Wait for models to load
+      pause:
+        seconds: 60
+      when: ollama_preload_models | length > 0
+      
+    - name: Test model generation
+      uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ ollama_port | default(11434) }}/api/generate"
+        method: POST
+        body_format: json
+        body:
+          model: "{{ ollama_preload_models[0] }}"
+          prompt: "Hello, how are you today?"
+          stream: false
+        timeout: 120
+      register: generation_test
+      when: ollama_preload_models | length > 0
+      
+    - name: Display generation test result
+      debug:
+        msg: 
+          - "Model generation test: {{ 'PASSED' if generation_test.status == 200 else 'FAILED' }}"
+          - "Response: {{ generation_test.json.response[:100] | default('No response') }}..."
+      when: ollama_preload_models | length > 0
+      
+    - name: Show GPU deployment summary
+      debug:
+        msg:
+          - "=== GPU Ollama Deployment Summary ==="
+          - "Host: {{ inventory_hostname }}"
+          - "IP: {{ ansible_default_ipv4.address }}"
+          - "GPU Support: {{ ollama_enable_gpu | default(false) }}"
+          - "Memory Limit: {{ ollama_memory_limit | default('4g') }}"
+          - "CPU Limit: {{ ollama_cpus | default('2.0') }}"
+          - "Preloaded Models: {{ ollama_preload_models | join(', ') }}"
+          - "Host Volumes: {{ ollama_use_host_volumes | default(false) }}"
+          - "Data Path: {{ ollama_host_data_path | default('Docker volume') }}"
+          - "Models Path: {{ ollama_host_models_path | default('Docker volume') }}"

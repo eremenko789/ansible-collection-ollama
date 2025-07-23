@@ -1,0 +1,43 @@
+---
+# Управление Docker volumes для Ollama
+
+- name: Создать Docker volume для данных Ollama
+  community.docker.docker_volume:
+    name: "{{ ollama_data_volume }}"
+    state: present
+  when: not ollama_use_host_volumes
+
+- name: Создать Docker volume для моделей Ollama
+  community.docker.docker_volume:
+    name: "{{ ollama_models_volume }}"
+    state: present
+  when: not ollama_use_host_volumes
+
+- name: Получить информацию о volume для данных
+  community.docker.docker_volume_info:
+    name: "{{ ollama_data_volume }}"
+  register: ollama_data_volume_info
+  when: not ollama_use_host_volumes
+
+- name: Получить информацию о volume для моделей
+  community.docker.docker_volume_info:
+    name: "{{ ollama_models_volume }}"
+  register: ollama_models_volume_info
+  when: not ollama_use_host_volumes
+
+- name: Вывести информацию о созданных volumes
+  ansible.builtin.debug:
+    msg:
+      - "Volume для данных: {{ ollama_data_volume }}"
+      - "Путь к данным: {{ ollama_data_volume_info.volume.Mountpoint | default('Docker managed') }}"
+      - "Volume для моделей: {{ ollama_models_volume }}"
+      - "Путь к моделям: {{ ollama_models_volume_info.volume.Mountpoint | default('Docker managed') }}"
+  when: not ollama_use_host_volumes
+
+- name: Вывести информацию о host volumes
+  ansible.builtin.debug:
+    msg:
+      - "Используются host directories:"
+      - "Путь к данным на хосте: {{ ollama_host_data_path }}"
+      - "Путь к моделям на хосте: {{ ollama_host_models_path }}"
+  when: ollama_use_host_volumes

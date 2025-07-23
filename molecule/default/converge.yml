@@ -1,0 +1,27 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  gather_facts: true
+  
+  pre_tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install Python dependencies
+      ansible.builtin.apt:
+        name:
+          - python3-pip
+          - python3-setuptools
+        state: present
+
+  roles:
+    - role: ollama
+      vars:
+        ollama_version: "latest"
+        ollama_use_host_volumes: false
+        ollama_preload_models: []  # Не загружаем модели для тестов
+        ollama_memory_limit: "2g"
+        ollama_cpus: "1.0"
