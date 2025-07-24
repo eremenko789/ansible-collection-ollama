@@ -1,0 +1,193 @@
+---
+argument_specs:
+  main:
+    short_description: Deploy Ollama with Docker
+    description: |
+      This role deploys Ollama using Docker with comprehensive configuration options
+      including GPU support, volume management, and model preloading.
+    author: Community Ollama Collection Team
+    options:
+      ollama_version:
+        description: Version of Ollama Docker image to use
+        type: str
+        default: "latest"
+      
+      ollama_image:
+        description: Docker image name for Ollama
+        type: str
+        default: "ollama/ollama"
+      
+      ollama_container_name:
+        description: Name of the Docker container
+        type: str
+        default: "ollama"
+      
+      ollama_port:
+        description: Port for Ollama API
+        type: int
+        default: 11434
+        
+      ollama_host:
+        description: Host address to bind the service
+        type: str
+        default: "0.0.0.0"
+      
+      ollama_use_host_volumes:
+        description: Use host directories instead of Docker volumes
+        type: bool
+        default: false
+      
+      ollama_data_volume:
+        description: Name of Docker volume for data
+        type: str
+        default: "ollama_data"
+      
+      ollama_models_volume:
+        description: Name of Docker volume for models
+        type: str
+        default: "ollama_models"
+      
+      ollama_host_data_path:
+        description: Host path for data when using host volumes
+        type: path
+        default: "/opt/ollama/data"
+      
+      ollama_host_models_path:
+        description: Host path for models when using host volumes
+        type: path
+        default: "/opt/ollama/models"
+      
+      ollama_environment_vars:
+        description: Environment variables for the container
+        type: dict
+        default:
+          OLLAMA_HOST: "0.0.0.0:11434"
+          OLLAMA_MODELS: "/root/.ollama/models"
+      
+      ollama_restart_policy:
+        description: Container restart policy
+        type: str
+        default: "unless-stopped"
+        choices:
+          - "no"
+          - "on-failure"
+          - "always"
+          - "unless-stopped"
+      
+      ollama_memory_limit:
+        description: Memory limit for the container
+        type: str
+        default: "4g"
+      
+      ollama_cpus:
+        description: CPU limit for the container
+        type: str
+        default: "2.0"
+      
+      ollama_enable_gpu:
+        description: Enable GPU support (requires NVIDIA GPU and drivers)
+        type: bool
+        default: false
+      
+      ollama_gpu_device_requests:
+        description: GPU device requests configuration
+        type: list
+        elements: dict
+        default:
+          - driver: nvidia
+            count: all
+            capabilities:
+              - gpu
+      
+      ollama_log_driver:
+        description: Logging driver for the container
+        type: str
+        default: "json-file"
+        choices:
+          - "json-file"
+          - "syslog"
+          - "journald"
+          - "gelf"
+          - "fluentd"
+          - "awslogs"
+          - "splunk"
+      
+      ollama_log_options:
+        description: Logging options
+        type: dict
+        default:
+          max-size: "10m"
+          max-file: "3"
+      
+      ollama_preload_models:
+        description: List of models to preload
+        type: list
+        elements: str
+        default: []
+      
+      ollama_user:
+        description: User for file ownership when using host volumes
+        type: str
+        default: "ollama"
+      
+      ollama_group:
+        description: Group for file ownership when using host volumes
+        type: str
+        default: "ollama"
+      
+      ollama_uid:
+        description: UID for the ollama user
+        type: int
+        default: 1000
+      
+      ollama_gid:
+        description: GID for the ollama group
+        type: int
+        default: 1000
+      
+      ollama_security_opts:
+        description: Security options for the container
+        type: list
+        elements: str
+        default: []
+      
+      ollama_additional_ports:
+        description: Additional ports to expose
+        type: list
+        elements: str
+        default: []
+      
+      # Docker installation options (passed to geerlingguy.docker)
+      docker_install_compose:
+        description: Whether to install Docker Compose
+        type: bool
+        default: true
+      
+      docker_install_compose_plugin:
+        description: Whether to install Docker Compose plugin
+        type: bool
+        default: true
+      
+      docker_compose_version:
+        description: Version of Docker Compose to install
+        type: str
+        required: false
+      
+      docker_users:
+        description: List of users to add to docker group
+        type: list
+        elements: str
+        default: []
+      
+      docker_daemon_options:
+        description: Docker daemon configuration options
+        type: dict
+        default: {}
+      
+      docker_restart_handler_state:
+        description: State for Docker service restart handler
+        type: str
+        default: "restarted"
+        choices:
+          - "restarted"
+          - "reloaded"
