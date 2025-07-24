@@ -16,6 +16,8 @@
 ### Из Ansible Galaxy
 
 ```bash
+# Установка коллекции и зависимостей
+ansible-galaxy install -r ansible-requirements.yml
 ansible-galaxy collection install community.ollama
 ```
 
@@ -24,6 +26,11 @@ ansible-galaxy collection install community.ollama
 ```bash
 git clone https://github.com/community/ollama-ansible-collection.git
 cd ollama-ansible-collection
+
+# Установка зависимостей
+ansible-galaxy install -r ansible-requirements.yml
+
+# Сборка и установка коллекции
 ansible-galaxy collection build
 ansible-galaxy collection install community-ollama-*.tar.gz
 ```
@@ -140,6 +147,9 @@ ansible-galaxy collection install community-ollama-*.tar.gz
 collections:
   - community.docker >= 3.0.0
   - community.general >= 1.0.0
+
+roles:
+  - geerlingguy.docker >= 7.0.0
 ```
 
 ### Для GPU поддержки

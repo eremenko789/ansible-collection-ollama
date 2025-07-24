@@ -7,48 +7,22 @@
     cache_valid_time: 3600
   become: true
 
-- name: Установить необходимые пакеты
+- name: Установить базовые пакеты
   ansible.builtin.apt:
     name:
-      - apt-transport-https
-      - ca-certificates
-      - curl
-      - gnupg
-      - lsb-release
       - python3-pip
+      - curl
     state: present
   become: true
 
-- name: Установить Docker GPG ключ
-  ansible.builtin.apt_key:
-    url: https://download.docker.com/linux/ubuntu/gpg
-    state: present
-  become: true
-
-- name: Добавить Docker репозиторий
-  ansible.builtin.apt_repository:
-    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
-    state: present
-    filename: docker
-  become: true
-
-- name: Установить Docker
-  ansible.builtin.apt:
-    name:
-      - docker-ce
-      - docker-ce-cli
-      - containerd.io
-      - docker-buildx-plugin
-      - docker-compose-plugin
-    state: present
-    update_cache: true
-  become: true
-
-- name: Запустить и включить службу Docker
-  ansible.builtin.systemd:
-    name: docker
-    state: started
-    enabled: true
+- name: Установить Docker используя роль geerlingguy.docker
+  ansible.builtin.include_role:
+    name: geerlingguy.docker
+  vars:
+    docker_install_compose: "{{ docker_install_compose }}"
+    docker_install_compose_plugin: "{{ docker_install_compose_plugin }}"
+    docker_users: "{{ docker_users }}"
+    docker_daemon_options: "{{ docker_daemon_options }}"
   become: true
 
 - name: Установить Docker Python модуль

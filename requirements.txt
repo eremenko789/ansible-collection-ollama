@@ -8,6 +8,9 @@ requests>=2.25.0
 jinja2>=3.0.0
 PyYAML>=5.4.0
 
+# Ansible роли
+ansible-galaxy-collection>=1.0.0
+
 # Для тестирования
 pytest>=6.0.0
 pytest-ansible>=3.0.0

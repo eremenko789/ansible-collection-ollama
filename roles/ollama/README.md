@@ -67,10 +67,22 @@
 | `ollama_gid` | `1000` | GID группы |
 | `ollama_security_opts` | `[]` | Опции безопасности для контейнера |
 
+### Docker установка (geerlingguy.docker)
+
+| Переменная | По умолчанию | Описание |
+|------------|--------------|----------|
+| `docker_install_compose` | `true` | Установка Docker Compose |
+| `docker_install_compose_plugin` | `true` | Установка Docker Compose plugin |
+| `docker_users` | `[]` | Пользователи для добавления в группу docker |
+| `docker_daemon_options` | `{}` | Опции конфигурации Docker daemon |
+| `docker_restart_handler_state` | `restarted` | Состояние для restart handler |
+
 ## Зависимости
 
 ```yaml
 dependencies:
+  - name: geerlingguy.docker
+    version: ">=7.0.0"
   - name: community.docker
     version: ">=3.0.0"
 ```
@@ -110,6 +122,24 @@ dependencies:
         ollama_use_host_volumes: true
         ollama_host_data_path: "/srv/ollama/data"
         ollama_host_models_path: "/srv/ollama/models"
+```
+
+### Развертывание с настройкой Docker пользователей
+
+```yaml
+- hosts: ollama_servers
+  become: yes
+  roles:
+    - role: community.ollama.ollama
+      vars:
+        docker_users:
+          - "{{ ansible_user }}"
+          - ubuntu
+        docker_daemon_options:
+          log-driver: "json-file"
+          log-opts:
+            max-size: "10m"
+            max-file: "3"
 ```
 
 ### Развертывание с GPU поддержкой

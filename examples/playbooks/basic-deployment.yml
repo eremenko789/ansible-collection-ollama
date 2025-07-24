@@ -10,6 +10,10 @@
     ollama_use_host_volumes: false
     ollama_preload_models: []
     
+    # Docker configuration
+    docker_users:
+      - "{{ ansible_user }}"
+    
   roles:
     - role: community.ollama.ollama
       tags: ['ollama']

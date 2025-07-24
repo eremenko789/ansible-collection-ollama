@@ -1,4 +1,6 @@
 ---
+# Ansible Galaxy requirements для коллекции Community Ollama
+
 collections:
   - name: community.docker
     version: ">=3.0.0"

@@ -58,3 +58,7 @@ credentials.yml
 # Build artifacts
 *.tar.gz
 *.tgz
+community-ollama-*.tar.gz
+
+# Setup script logs
+setup.log
