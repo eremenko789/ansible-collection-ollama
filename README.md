@@ -35,11 +35,12 @@ ansible-galaxy collection install community-ollama-*.tar.gz
 Основная роль для развертывания Ollama с использованием Docker.
 
 **Особенности:**
-- Автоматическая установка Docker
+- Использует проверенную роль `geerlingguy.docker` для установки Docker
 - Поддержка GPU (NVIDIA)
 - Гибкая конфигурация volumes
 - Предварительная загрузка моделей
 - Мониторинг и проверка работоспособности
+- Автоматическое управление зависимостями
 
 **Поддерживаемые ОС:**
 - Ubuntu 24.04
@@ -137,6 +138,9 @@ ansible-galaxy collection install community-ollama-*.tar.gz
 ### Зависимости Ansible
 
 ```yaml
+roles:
+  - geerlingguy.docker >= 7.0.0
+
 collections:
   - community.docker >= 3.0.0
   - community.general >= 1.0.0

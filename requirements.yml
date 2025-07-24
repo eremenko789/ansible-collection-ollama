@@ -1,0 +1,9 @@
+---
+# Requirements for the Ollama collection
+roles:
+  - name: geerlingguy.docker
+    version: ">=7.0.0"
+
+collections:
+  - name: community.docker
+    version: ">=3.0.0"
