@@ -1,0 +1,107 @@
+---
+# Развертывание Ollama с настройкой Docker
+- name: Deploy Ollama with Custom Docker Configuration
+  hosts: ollama_servers
+  become: true
+  gather_facts: true
+  
+  vars:
+    # Настройки Docker через geerlingguy.docker роль
+    docker_edition: "ce"
+    docker_packages_state: "latest"
+    docker_service_manage: true
+    docker_service_state: "started"
+    docker_service_enabled: true
+    
+    # Пользователи для добавления в группу docker
+    docker_users:
+      - "{{ ansible_user }}"
+      - "ollama"
+    
+    # Настройки Ollama
+    ollama_version: "latest"
+    ollama_use_host_volumes: true
+    ollama_host_data_path: "/opt/ollama/data"
+    ollama_host_models_path: "/opt/ollama/models"
+    ollama_memory_limit: "6g"
+    ollama_cpus: "3.0"
+    
+    # Модели для предварительной загрузки
+    ollama_preload_models:
+      - "llama3.2"
+      - "mistral"
+      
+    # Дополнительные настройки безопасности
+    ollama_security_opts:
+      - "no-new-privileges:true"
+      - "seccomp=unconfined"
+    
+  pre_tasks:
+    - name: Check system requirements
+      assert:
+        that:
+          - ansible_memtotal_mb >= 4096
+          - ansible_processor_vcpus >= 2
+        fail_msg: "System does not meet minimum requirements (4GB RAM, 2 CPU cores)"
+        
+    - name: Display system info
+      debug:
+        msg:
+          - "System: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "Memory: {{ ansible_memtotal_mb }}MB"
+          - "CPU cores: {{ ansible_processor_vcpus }}"
+          - "Architecture: {{ ansible_architecture }}"
+      
+  roles:
+    - role: community.ollama.ollama
+      tags: ['ollama']
+      
+  post_tasks:
+    - name: Verify Docker service
+      systemd:
+        name: docker
+        state: started
+      check_mode: true
+      register: docker_service_check
+      
+    - name: Display Docker status
+      debug:
+        msg: "Docker service: {{ 'Running' if docker_service_check.status.ActiveState == 'active' else 'Not running' }}"
+        
+    - name: Check Docker group membership
+      command: groups {{ ansible_user }}
+      register: user_groups
+      changed_when: false
+      
+    - name: Verify user in docker group
+      debug:
+        msg: "User {{ ansible_user }} in docker group: {{ 'Yes' if 'docker' in user_groups.stdout else 'No' }}"
+        
+    - name: Test Ollama API
+      uri:
+        url: "http://localhost:{{ ollama_port | default(11434) }}/api/tags"
+        method: GET
+        timeout: 10
+      register: ollama_models_check
+      retries: 5
+      delay: 10
+      
+    - name: Display available models
+      debug:
+        msg: "Available models: {{ ollama_models_check.json.models | map(attribute='name') | list | join(', ') }}"
+      when: ollama_models_check.json.models is defined
+      
+    - name: Show complete deployment summary
+      debug:
+        msg:
+          - "=== Complete Ollama + Docker Deployment Summary ==="
+          - "Host: {{ inventory_hostname }}"
+          - "Docker Version: {{ docker_edition }}"
+          - "Docker Users: {{ docker_users | join(', ') }}"
+          - "Ollama Version: {{ ollama_version }}"
+          - "Memory Limit: {{ ollama_memory_limit }}"
+          - "CPU Limit: {{ ollama_cpus }}"
+          - "Data Path: {{ ollama_host_data_path }}"
+          - "Models Path: {{ ollama_host_models_path }}"
+          - "Preloaded Models: {{ ollama_preload_models | join(', ') }}"
+          - "API Endpoint: http://{{ ansible_default_ipv4.address }}:{{ ollama_port | default(11434) }}"

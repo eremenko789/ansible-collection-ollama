@@ -1,4 +1,21 @@
 ---
+# Настройки для geerlingguy.docker роли
+docker_edition: "ce"
+docker_packages:
+  - "docker-{{ docker_edition }}"
+  - "docker-{{ docker_edition }}-cli"
+  - "containerd.io"
+  - "docker-buildx-plugin"
+  - "docker-compose-plugin"
+docker_packages_state: present
+docker_service_manage: true
+docker_service_state: started
+docker_service_enabled: true
+docker_install_compose_plugin: false
+docker_install_compose: false
+docker_add_repo: true
+docker_users: []
+
 # Основные параметры Ollama
 ollama_version: "latest"
 ollama_image: "ollama/ollama"

@@ -6,9 +6,21 @@
 
 - Ubuntu 24.04 (также поддерживает 22.04 и 20.04)
 - Ansible >= 2.9
+- Роль `geerlingguy.docker` >= 7.0.0
 - Коллекция `community.docker` >= 3.0.0
 
 ## Переменные роли
+
+### Настройки Docker (для geerlingguy.docker роли)
+
+| Переменная | По умолчанию | Описание |
+|------------|--------------|----------|
+| `docker_edition` | `ce` | Издание Docker (ce/ee) |
+| `docker_packages_state` | `present` | Состояние пакетов Docker |
+| `docker_service_manage` | `true` | Управлять ли службой Docker |
+| `docker_service_state` | `started` | Состояние службы Docker |
+| `docker_service_enabled` | `true` | Включать ли автозапуск Docker |
+| `docker_users` | `[]` | Пользователи для добавления в группу docker |
 
 ### Основные параметры
 
@@ -69,11 +81,17 @@
 
 ## Зависимости
 
+Роль автоматически использует следующие зависимости:
+
 ```yaml
 dependencies:
+  - name: geerlingguy.docker
+    version: ">=7.0.0"
   - name: community.docker
     version: ">=3.0.0"
 ```
+
+**Важно:** Роль `geerlingguy.docker` будет автоматически установлена и настроена перед развертыванием Ollama. Это гарантирует правильную установку и конфигурацию Docker.
 
 ## Примеры использования
 
